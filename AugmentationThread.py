@@ -11,7 +11,7 @@ class AugmentationThread(QThread):
     progress_preview = pyqtSignal(numpy.ndarray, object, numpy.ndarray, object)     # Сигнал для превью
     ENABLE_PREVIEW = True
 
-    def __init__(self, directory, image_paths, labels_dir, output_images_dir, output_labels_dir, pipeline, mode, augmentations_per_image, parent=None):
+    def __init__(self, directory, image_paths, labels_dir, output_images_dir, output_labels_dir, pipeline, mode, augmentations_per_image, workers, parent=None):
         super().__init__(parent)
         self.directory = directory
         self.image_paths = image_paths
@@ -22,6 +22,7 @@ class AugmentationThread(QThread):
         self.mode = mode
         self.augmentations_per_image = augmentations_per_image
         self._is_running = True
+        self.workers = workers
 
     def process_image(self, image_path):
         if not self._is_running:
@@ -66,7 +67,7 @@ class AugmentationThread(QThread):
         total_iterations = total_images * self.augmentations_per_image
         iteration = 0
 
-        with ThreadPoolExecutor(max_workers=12) as executor:
+        with ThreadPoolExecutor(max_workers=self.workers) as executor:
             future_to_image = {executor.submit(self.process_image, image_path): image_path for image_path in self.image_paths}
 
             for future in as_completed(future_to_image):

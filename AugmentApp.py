@@ -1,7 +1,7 @@
 import os
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
-    QLabel, QPushButton, QFileDialog, QWidget, QProgressBar
+    QLabel, QPushButton, QFileDialog, QWidget, QProgressBar, QSpinBox
 )
 from PyQt5.QtCore import Qt
 from AugmentationSettingsDialog import AugmentationSettingsDialog
@@ -15,6 +15,9 @@ class DataAugmentationApp(QMainWindow):
     WINDOW_TITLE = "Приложение аугментации"
     DEFAULT_PROBABILITY = 0.3
     DEFAULT_AUG_PER_IMAGE = 3
+    DEFAULT_WORKERS = 12
+    MIN_WORKERS = 1
+    MAX_WORKERS = 64
 
     def __init__(self):
         super().__init__()
@@ -27,6 +30,7 @@ class DataAugmentationApp(QMainWindow):
         self.pipeline = None
         self.mode = Modes.ONLY_IMAGES
         self.augmentations_per_image = self.DEFAULT_AUG_PER_IMAGE
+        self.workers = self.DEFAULT_WORKERS
 
         # Состояния параметров аугментации (все включены по умолчанию)
         self.augmentation_settings = {
@@ -56,10 +60,22 @@ class DataAugmentationApp(QMainWindow):
         self.settings_button.clicked.connect(self.open_settings)
         layout.addWidget(self.settings_button)
 
-        # Добавляем кнопку "Старт аугментации"
+        start_layout = QHBoxLayout()
+
         self.start_button = QPushButton("Старт аугментации")
         self.start_button.clicked.connect(self.start_augmentation)
-        layout.addWidget(self.start_button)
+        start_layout.addWidget(self.start_button)
+
+        self.threads_label = QLabel("Потоков: ")
+        start_layout.addWidget(self.threads_label)
+
+        self.threads_spinbox = QSpinBox()
+        self.threads_spinbox.setRange(self.MIN_WORKERS, self.MAX_WORKERS)  
+        self.threads_spinbox.setValue(self.DEFAULT_WORKERS) 
+        self.threads_spinbox.valueChanged.connect(self.update_workers)   
+        start_layout.addWidget(self.threads_spinbox)
+
+        layout.addLayout(start_layout)
 
         # Кнопка "Остановить аугментацию" (по умолчанию скрыта)
         self.stop_button = QPushButton("Остановить аугментацию")
@@ -92,6 +108,9 @@ class DataAugmentationApp(QMainWindow):
         container.setLayout(layout)
         self.setCentralWidget(container)
 
+    def update_workers(self, value):
+        self.workers = value
+
     def start_augmentation(self):
         if not self.directory:
             Utilities.show_error_message("Выберите директорию перед началом аугментации.")
@@ -117,6 +136,7 @@ class DataAugmentationApp(QMainWindow):
             self.pipeline,
             self.mode,
             self.augmentations_per_image,
+            self.workers,
         )
         self.augmentation_thread.progress.connect(self.progress_bar.setValue)
         self.augmentation_thread.error.connect(Utilities.show_error_message)
