@@ -3,6 +3,7 @@ from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt
 import cv2
 import os
+import uuid
 from Modes import Modes
 from ImageAugmentor import ImageAugmentor
 
@@ -22,6 +23,7 @@ class Utilities:
             image = cv2.imread(image_path)
             if image is None:
                 raise ValueError("Файл не является изображением или поврежден")
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             return image
         except Exception as e:
             Utilities.show_error_message(f"Ошибка при загрузке изображения: {str(e)}")
@@ -135,11 +137,26 @@ class Utilities:
             
     @staticmethod
     def save_augm(mode, iter, image_path, output_images_dir, output_labels_dir, augmented_image, augmented_bboxes, augmented_labels):
+        base_name, ext = os.path.splitext(os.path.basename(image_path))
         new_image_name = f"aug_{iter}_{os.path.basename(image_path)}"
         new_image_path = os.path.join(output_images_dir, new_image_name)
 
-        cv2.imwrite(new_image_path, augmented_image)
+        Utilities.save_image(augmented_image, new_image_path)
 
         if mode == Modes.IMAGES_WITH_LABELS and augmented_bboxes and augmented_labels:
-            new_label_path = os.path.join(output_labels_dir, new_image_name.replace(".jpg", ".txt"))
+            new_label_name = f"aug_{iter}_{base_name}.txt"
+            new_label_path = os.path.join(output_labels_dir, new_label_name)
             Utilities.save_yolo_labels(new_label_path, augmented_bboxes, augmented_labels)
+            
+    @staticmethod        
+    def save_image(image, path):
+        try:
+            if not os.path.splitext(path)[1]:
+                file_name = f"{uuid.uuid4()}.png"
+                path = os.path.join(path, file_name)
+                
+            cv2.imwrite(path, image)
+            return True
+        except Exception as e:
+            Utilities.show_error_message(f"Ошибка сохранения: {e}")
+            return False        
