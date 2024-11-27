@@ -30,6 +30,9 @@ class YoloModel:
                 for box in result.boxes:
                     bboxes.append(box.xywhn[0])
             
+            if bboxes == []:
+                Utilities.show_message("Ничего не обнаружено")
+                
             return True, image, bboxes
             
         except Exception as e:
