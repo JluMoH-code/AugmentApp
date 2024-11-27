@@ -9,6 +9,7 @@ from Modes import Modes
 from ImageAugmentor import ImageAugmentor
 from AugmentationThread import AugmentationThread
 from Utilities import Utilities
+from YoloModel import YoloModel
 
 class DataAugmentationApp(QMainWindow):
     PREVIEW_HEIGHT, PREVIEW_WIDTH = 400, 400
@@ -18,6 +19,7 @@ class DataAugmentationApp(QMainWindow):
     DEFAULT_WORKERS = 12
     MIN_WORKERS = 1
     MAX_WORKERS = 64
+    MANUAL_SAVE_DIRECTORY = "saved"
 
     def __init__(self):
         super().__init__()
@@ -26,11 +28,14 @@ class DataAugmentationApp(QMainWindow):
 
         self.directory = None
         self.image_paths = []
+        self.original_image = None
+        self.augmented_image = None
         self.current_index = 0
         self.pipeline = None
         self.mode = Modes.ONLY_IMAGES
         self.augmentations_per_image = self.DEFAULT_AUG_PER_IMAGE
         self.workers = self.DEFAULT_WORKERS
+        self.yolo_model = YoloModel()
 
         # Состояния параметров аугментации (все включены по умолчанию)
         self.augmentation_settings = {
@@ -59,6 +64,10 @@ class DataAugmentationApp(QMainWindow):
         self.settings_button = QPushButton("Настройка аугментации")
         self.settings_button.clicked.connect(self.open_settings)
         layout.addWidget(self.settings_button)
+        
+        self.load_weights_button = QPushButton("Загрузить веса модели")
+        self.load_weights_button.clicked.connect(self.load_weights)
+        layout.addWidget(self.load_weights_button)
 
         start_layout = QHBoxLayout()
 
@@ -94,6 +103,18 @@ class DataAugmentationApp(QMainWindow):
         self.image_layout.addWidget(self.original_image_label)
         self.image_layout.addWidget(self.augmented_image_label)
         layout.addLayout(self.image_layout)
+        
+        self.detect_layout = QHBoxLayout()
+        self.detect_button = QPushButton("Обнаружить")
+        self.detect_button.clicked.connect(self.detect)
+        self.save_button = QPushButton("Сохранить")
+        self.save_button.clicked.connect(self.save_augment_image)
+        self.update_button = QPushButton("Обновить")
+        self.update_button.clicked.connect(self.update_augment_image)
+        self.detect_layout.addWidget(self.detect_button)
+        self.detect_layout.addWidget(self.save_button)
+        self.detect_layout.addWidget(self.update_button)
+        layout.addLayout(self.detect_layout)
 
         self.nav_layout = QHBoxLayout()
         self.prev_button = QPushButton("Предыдущее")
@@ -200,23 +221,49 @@ class DataAugmentationApp(QMainWindow):
             self.pipeline = ImageAugmentor.update_pipeline(self.augmentation_settings, self.mode)
             self.show_image_pair()
 
+    def load_weights(self):
+        weights_path, _ = QFileDialog.getOpenFileName(self, "Select YOLO Weights", "", "Weights Files (*.pt)")
+        if weights_path:
+            self.yolo_model.load_weights(weights_path)
+
+    def detect(self):
+        if self.augmented_image is None:
+            return
+        
+        ok, detected_image, bboxes = self.yolo_model.detect(self.augmented_image)
+        if ok:
+            self.display_image(detected_image, bboxes, self.augmented_image_label, (255, 0, 0))
+    
+    def update_augment_image(self):
+        self.show_image_pair()
+    
+    def save_augment_image(self):
+        if not self.directory:
+            Utilities.show_error_message("Выберите директорию перед началом аугментации.")
+            return
+        
+        save_directory = os.path.join(self.directory, self.MANUAL_SAVE_DIRECTORY)
+        os.makedirs(save_directory, exist_ok=True)
+        if Utilities.save_image(self.augmented_image, save_directory):
+            Utilities.show_message(f"Успешно сохранено!")
+        
     def show_image_pair(self):
         if not self.has_valid_image_paths():
             return
 
         original_path = self.image_paths[self.current_index]
         
-        image = Utilities.open_image(original_path)
-        if image is None:
+        self.original_image = Utilities.open_image(original_path)
+        if self.original_image is None:
             return
 
         bboxes, labels = Utilities.process_labels(self.mode, self.directory, original_path)
         
-        self.display_image(image, bboxes, self.original_image_label)
+        self.display_image(self.original_image, bboxes, self.original_image_label)
 
-        ok, augmented_image, augmented_bboxes, augmented_labels = Utilities.attempt_augmentation(self.pipeline, image, bboxes, labels)
+        ok, self.augmented_image, augmented_bboxes, augmented_labels = Utilities.attempt_augmentation(self.pipeline, self.original_image, bboxes, labels)
         
-        self.display_image(augmented_image, augmented_bboxes, self.augmented_image_label)
+        self.display_image(self.augmented_image, augmented_bboxes, self.augmented_image_label)
 
         self.adjust_widget_sizes()
 
@@ -224,9 +271,9 @@ class DataAugmentationApp(QMainWindow):
         if not self.image_paths: return False
         else: return self.image_paths    
 
-    def display_image(self, image, bboxes, label_widget):
+    def display_image(self, image, bboxes, label_widget, color=(0, 255, 0)):
         if bboxes:
-            image = Utilities.draw_boxes(image, bboxes)
+            image = Utilities.draw_boxes(image, bboxes, color)
 
         pixmap = Utilities.numpy_to_pixmap(image, self.PREVIEW_WIDTH, self.PREVIEW_HEIGHT).scaled(
             self.PREVIEW_WIDTH, self.PREVIEW_HEIGHT, Qt.KeepAspectRatio
