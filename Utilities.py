@@ -22,6 +22,7 @@ class Utilities:
             image = cv2.imread(image_path)
             if image is None:
                 raise ValueError("Файл не является изображением или поврежден")
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             return image
         except Exception as e:
             Utilities.show_error_message(f"Ошибка при загрузке изображения: {str(e)}")
