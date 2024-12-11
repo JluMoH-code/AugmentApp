@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
     QLabel, QPushButton, QFileDialog, QWidget, QProgressBar, QSpinBox
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QEvent
 from AugmentationSettingsDialog import AugmentationSettingsDialog
 from Modes import Modes
 from ImageAugmentor import ImageAugmentor
@@ -128,6 +128,20 @@ class DataAugmentationApp(QMainWindow):
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
+
+    def keyPressEvent(self, event):
+        keymap = {
+            Qt.Key_A: self.detect,
+            Qt.Key_S: self.save_augment_image,
+            Qt.Key_D: self.update_augment_image,
+            Qt.Key_V: self.next_image,
+            Qt.Key_C: self.prev_image,
+        }
+
+        if event.key() in keymap:
+            keymap[event.key()]()
+
+        return super(DataAugmentationApp, self).keyPressEvent(event)
 
     def update_workers(self, value):
         self.workers = value
