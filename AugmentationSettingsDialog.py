@@ -97,13 +97,20 @@ class AugmentationSettingsDialog(QDialog):
         container = QWidget()
         container.setLayout(self.parameter_layout)
         scroll_area.setWidget(container)
+        
+        self.link_HBoxLayout = QHBoxLayout()
+        
+        self.master_checkBox = QCheckBox("Вкл/откл")
+        self.master_checkBox.stateChanged.connect(self.toggle_all_augmentations)
+        self.link_HBoxLayout.addWidget(self.master_checkBox)
 
         self.link_label = QLabel(
             '<a href="https://demo.albumentations.ai/">Примеры аугментаций</a>'
         )
         self.link_label.setOpenExternalLinks(True)  # Открывать ссылки в браузере
         self.link_label.setAlignment(Qt.AlignCenter)
-        self.layout.addWidget(self.link_label)
+        self.link_HBoxLayout.addWidget(self.link_label)
+        self.layout.addLayout(self.link_HBoxLayout)
 
         self.layout.addWidget(scroll_area)
         self.ok_button = QPushButton("OK")
@@ -116,6 +123,10 @@ class AugmentationSettingsDialog(QDialog):
         for widgets in self.aug_widgets.values():
             widgets["slider"].setValue(value)  
             widgets["label"].setText(f"{probability:.2f}")  
+
+    def toggle_all_augmentations(self, state):
+        for aug, widgets in self.aug_widgets.items():
+            widgets['checkbox'].setChecked(state == Qt.Checked)
 
     def udpate_augmentation_label(self, value):
         self.augmentations_label.setText(f"Аугментаций на изображение: {value}")
